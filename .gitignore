@@ -1,0 +1,29 @@
+# Build artifacts
+build/
+zig-out/
+zig-cache/
+.zig-cache/
+
+# Swift/Xcode
+macos/.build/
+macos/.swiftpm/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+*.dSYM/
+
+# macOS
+.DS_Store
+*.dmg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.log
