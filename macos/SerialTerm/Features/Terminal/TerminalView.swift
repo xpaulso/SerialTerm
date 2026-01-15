@@ -5,6 +5,7 @@ import AppKit
 struct TerminalView: NSViewRepresentable {
     @Binding var output: [UInt8]
     var onInput: (Data) -> Void
+    var onSizeChange: ((Int, Int) -> Void)?
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     func makeCoordinator() -> Coordinator {
@@ -14,6 +15,7 @@ struct TerminalView: NSViewRepresentable {
     func makeNSView(context: Context) -> TerminalNSView {
         let view = TerminalNSView()
         view.onInput = onInput
+        view.onSizeChange = onSizeChange
         view.applyAppearance(appearanceManager.settings)
         context.coordinator.setupKeyMonitor(for: view)
 
@@ -28,6 +30,7 @@ struct TerminalView: NSViewRepresentable {
     func updateNSView(_ nsView: TerminalNSView, context: Context) {
         nsView.processOutput(output)
         nsView.applyAppearance(appearanceManager.settings)
+        nsView.onSizeChange = onSizeChange
         context.coordinator.onInput = onInput
     }
 
@@ -400,6 +403,7 @@ class TerminalBuffer {
 
 class TerminalNSView: NSView {
     var onInput: ((Data) -> Void)?
+    var onSizeChange: ((Int, Int) -> Void)?
 
     private var scrollView: NSScrollView!
     private var contentView: TerminalContentView!
@@ -840,6 +844,12 @@ class TerminalNSView: NSView {
         if newCols != currentBuffer.cols || newRows != currentBuffer.rows {
             mainBuffer.resize(newRows: newRows, newCols: newCols)
             altBuffer.resize(newRows: newRows, newCols: newCols)
+
+            // Notify about size change
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.onSizeChange?(self.currentBuffer.cols, self.currentBuffer.rows)
+            }
         }
 
         contentView.frame = CGRect(x: 0, y: 0,

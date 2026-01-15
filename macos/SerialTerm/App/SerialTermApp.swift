@@ -21,8 +21,10 @@ struct SerialTermApp: App {
         WindowGroup {
             TerminalWindowView()
                 .environmentObject(portManager)
+                .frame(minWidth: 640, minHeight: 400)
         }
-        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 900, height: 600)
+        .windowResizability(.contentSize)
         .commands {
             SerialCommands(portManager: portManager)
             TransferCommands()
@@ -76,6 +78,7 @@ final class AppState: ObservableObject {
     // Terminal state
     @Published var terminalOutput: [UInt8] = []
     @Published var statusMessage: String = "Disconnected"
+    @Published var terminalSize: (cols: Int, rows: Int) = (80, 24)
 
     // Transfer state
     @Published var activeTransfer: TransferState?

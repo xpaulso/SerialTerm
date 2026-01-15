@@ -11,7 +11,10 @@ struct ContentView: View {
             // Terminal view with appearance settings
             TerminalView(
                 output: $appState.terminalOutput,
-                onInput: handleInput
+                onInput: handleInput,
+                onSizeChange: { cols, rows in
+                    appState.terminalSize = (cols, rows)
+                }
             )
             .opacity(appState.isConnected ? 1.0 : 0.3)
 
@@ -345,14 +348,15 @@ struct ConnectionToolbar: View {
                     .font(.system(.caption, design: .monospaced))
                     .foregroundColor(.secondary)
 
-                // Terminal type
-                Text("VT220")
+                // Terminal size (cols x rows)
+                Text("\(appState.terminalSize.cols)×\(appState.terminalSize.rows)")
                     .font(.system(.caption, design: .monospaced))
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)
-                    .background(Color.accentColor.opacity(0.2))
+                    .background(Color.secondary.opacity(0.1))
                     .cornerRadius(3)
+                    .help("Terminal size (columns × rows)")
 
                 // Logging button
                 Button(action: toggleLogging) {
