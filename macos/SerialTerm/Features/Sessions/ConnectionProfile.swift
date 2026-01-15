@@ -1,7 +1,7 @@
 import Foundation
 
 /// A saved connection profile for quick access
-struct ConnectionProfile: Identifiable, Codable, Equatable {
+struct ConnectionProfile: Identifiable, Codable, Equatable, Hashable {
     let id: UUID
     var name: String
     var portPath: String

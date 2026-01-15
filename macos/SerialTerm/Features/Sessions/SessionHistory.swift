@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a past session
-struct SessionHistoryEntry: Identifiable, Codable, Equatable {
+struct SessionHistoryEntry: Identifiable, Codable, Equatable, Hashable {
     let id: UUID
     let portPath: String
     let portName: String

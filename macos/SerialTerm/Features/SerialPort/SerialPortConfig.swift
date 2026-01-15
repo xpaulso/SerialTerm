@@ -1,7 +1,7 @@
 import Foundation
 
 /// Serial port configuration
-struct SerialPortConfig: Codable, Equatable {
+struct SerialPortConfig: Codable, Equatable, Hashable {
     var baudRate: BaudRate = .b115200
     var dataBits: DataBits = .eight
     var parity: Parity = .none
@@ -125,6 +125,9 @@ struct SerialPortConfig: Codable, Equatable {
     var summary: String {
         "\(baudRate.rawValue) \(dataBits.rawValue)\(parity.shortDescription)\(stopBits.rawValue)"
     }
+
+    /// Alias for toolbar display
+    var shortSummary: String { summary }
 
     /// Common preset configurations
     static let `default` = SerialPortConfig()

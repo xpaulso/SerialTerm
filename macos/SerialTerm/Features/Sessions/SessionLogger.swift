@@ -191,12 +191,13 @@ class SessionLogger: ObservableObject {
 }
 
 /// Information about a log file
-struct LogFileInfo: Identifiable {
-    let id = UUID()
+struct LogFileInfo: Identifiable, Hashable, Equatable {
     let url: URL
     let name: String
     let creationDate: Date
     let size: Int
+
+    var id: URL { url }
 
     var sizeString: String {
         ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
@@ -207,5 +208,13 @@ struct LogFileInfo: Identifiable {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: creationDate)
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(url)
+    }
+
+    static func == (lhs: LogFileInfo, rhs: LogFileInfo) -> Bool {
+        lhs.url == rhs.url
     }
 }

@@ -336,8 +336,23 @@ struct ConnectionToolbar: View {
                 .frame(width: 8, height: 8)
 
             if appState.isConnected {
+                // Port name
                 Text(appState.currentPort?.name ?? "Connected")
                     .font(.system(.caption, design: .monospaced))
+
+                // Serial config summary (e.g., "115200 8N1")
+                Text(appState.portConfig.shortSummary)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.secondary)
+
+                // Terminal type
+                Text("VT220")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.2))
+                    .cornerRadius(3)
 
                 // Logging button
                 Button(action: toggleLogging) {
@@ -351,6 +366,10 @@ struct ConnectionToolbar: View {
                 }
                 .help("Disconnect")
             } else {
+                Text("Disconnected")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.secondary)
+
                 Button(action: { appState.showConnectionSheet = true }) {
                     Image(systemName: "cable.connector")
                 }
