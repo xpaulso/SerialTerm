@@ -5,6 +5,7 @@ import AppKit
 struct TerminalView: NSViewRepresentable {
     @Binding var output: [UInt8]
     var onInput: (Data) -> Void
+    @ObservedObject var appearanceManager = AppearanceManager.shared
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onInput: onInput)
@@ -13,6 +14,7 @@ struct TerminalView: NSViewRepresentable {
     func makeNSView(context: Context) -> TerminalNSView {
         let view = TerminalNSView()
         view.onInput = onInput
+        view.applyAppearance(appearanceManager.settings)
         context.coordinator.setupKeyMonitor(for: view)
 
         // Ensure the view becomes first responder when it appears
@@ -25,6 +27,7 @@ struct TerminalView: NSViewRepresentable {
 
     func updateNSView(_ nsView: TerminalNSView, context: Context) {
         nsView.processOutput(output)
+        nsView.applyAppearance(appearanceManager.settings)
         context.coordinator.onInput = onInput
     }
 
@@ -163,8 +166,8 @@ struct ANSIColors {
 
 struct TerminalCell {
     var character: Character = " "
-    var foreground: NSColor = .textColor
-    var background: NSColor = .clear
+    var foreground: NSColor? = nil  // nil means use terminal default
+    var background: NSColor? = nil  // nil means use terminal default (transparent)
     var bold: Bool = false
     var italic: Bool = false
     var underline: Bool = false
@@ -187,9 +190,9 @@ class TerminalBuffer {
     var scrollTop: Int = 0
     var scrollBottom: Int
 
-    // Current attributes
-    var currentForeground: NSColor = .textColor
-    var currentBackground: NSColor = .clear
+    // Current attributes (nil = use terminal default)
+    var currentForeground: NSColor? = nil
+    var currentBackground: NSColor? = nil
     var currentBold = false
     var currentItalic = false
     var currentUnderline = false
@@ -383,8 +386,8 @@ class TerminalBuffer {
     }
 
     func resetAttributes() {
-        currentForeground = .textColor
-        currentBackground = .clear
+        currentForeground = nil  // Use terminal default
+        currentBackground = nil  // Use terminal default (transparent)
         currentBold = false
         currentItalic = false
         currentUnderline = false
@@ -429,11 +432,53 @@ class TerminalNSView: NSView {
     private let defaultRows = 24
     private let defaultCols = 80
     var terminalFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-    var foregroundColor = NSColor.textColor
-    var backgroundColor = NSColor.textBackgroundColor
+    var foregroundColor = NSColor.white
+    var backgroundColor = NSColor(red: 0.1, green: 0.1, blue: 0.12, alpha: 1.0)
+    var cursorColor = NSColor.green
 
     var charWidth: CGFloat = 7.8
     var charHeight: CGFloat = 16.0
+
+    /// Apply appearance settings from AppearanceManager
+    func applyAppearance(_ settings: AppearanceSettings) {
+        let newFont = settings.font
+        let newForeground = settings.nsForegroundColor
+        let newBackground = settings.nsBackgroundColor
+        let newCursor = settings.nsCursorColor
+
+        // Check if anything changed
+        let fontChanged = terminalFont != newFont
+        let colorsChanged = foregroundColor != newForeground ||
+                           backgroundColor != newBackground ||
+                           cursorColor != newCursor
+
+        if fontChanged || colorsChanged {
+            terminalFont = newFont
+            foregroundColor = newForeground
+            backgroundColor = newBackground
+            cursorColor = newCursor
+
+            // Update font metrics if font changed
+            if fontChanged {
+                let testString = "M" as NSString
+                let attrs: [NSAttributedString.Key: Any] = [.font: terminalFont]
+                let size = testString.size(withAttributes: attrs)
+                charWidth = size.width
+                charHeight = size.height
+            }
+
+            // Update scroll view background
+            scrollView?.backgroundColor = backgroundColor
+
+            // Trigger redraw - cell colors are resolved at draw time
+            contentView?.setNeedsDisplay(contentView?.bounds ?? .zero)
+
+            // Resize if font changed
+            if fontChanged {
+                needsLayout = true
+            }
+        }
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -700,7 +745,7 @@ class TerminalNSView: NSView {
                     )
                     i += 4
                 }
-            case 39: currentBuffer.currentForeground = .textColor
+            case 39: currentBuffer.currentForeground = nil  // Default foreground
             case 40...47: currentBuffer.currentBackground = ANSIColors.standardColors[param - 40]
             case 48: // Extended background
                 if i + 2 < csiParams.count && csiParams[i + 1] == 5 {
@@ -715,7 +760,7 @@ class TerminalNSView: NSView {
                     )
                     i += 4
                 }
-            case 49: currentBuffer.currentBackground = .clear
+            case 49: currentBuffer.currentBackground = nil  // Default background
             case 90...97: currentBuffer.currentForeground = ANSIColors.standardColors[param - 90 + 8]
             case 100...107: currentBuffer.currentBackground = ANSIColors.standardColors[param - 100 + 8]
             default: break
@@ -838,12 +883,15 @@ class TerminalContentView: NSView {
                 let y = CGFloat(row) * tv.charHeight + 8
                 let cellRect = CGRect(x: x, y: y, width: tv.charWidth, height: tv.charHeight)
 
-                // Draw cell background
-                var bgColor = cell.background
-                var fgColor = cell.foreground
+                // Resolve colors - nil means use terminal default
+                var bgColor = cell.background ?? NSColor.clear
+                var fgColor = cell.foreground ?? tv.foregroundColor
 
                 if cell.inverse {
-                    swap(&bgColor, &fgColor)
+                    // When inversed, swap fg/bg but use terminal bg if cell bg was nil
+                    let resolvedBg = cell.background ?? tv.backgroundColor
+                    bgColor = fgColor
+                    fgColor = resolvedBg
                 }
 
                 if cell.dim {
@@ -882,7 +930,7 @@ class TerminalContentView: NSView {
             let cursorY = CGFloat(buffer.cursorRow) * tv.charHeight + 8
             let cursorRect = CGRect(x: cursorX, y: cursorY, width: tv.charWidth, height: tv.charHeight)
 
-            NSColor.textColor.withAlphaComponent(0.5).setFill()
+            tv.cursorColor.withAlphaComponent(0.7).setFill()
             cursorRect.fill()
         }
     }
