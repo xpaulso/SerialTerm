@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject var appState: AppState
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var profileManager = ProfileManager.shared
     @ObservedObject var portManager = SerialPortManager.shared
@@ -29,7 +28,7 @@ struct SettingsView: View {
                     Label("Appearance", systemImage: "paintbrush")
                 }
 
-            serialTab
+            serialDefaultsTab
                 .tabItem {
                     Label("Serial", systemImage: "cable.connector")
                 }
@@ -44,13 +43,7 @@ struct SettingsView: View {
                     Label("Logging", systemImage: "doc.text")
                 }
         }
-        .frame(width: 540, height: 520)
-        .onAppear {
-            portConfig = appState.portConfig
-            if let currentPort = appState.currentPort {
-                selectedPortPath = currentPort.path
-            }
-        }
+        .frame(width: 540, height: 420)
     }
 
     // MARK: - General Tab
@@ -199,165 +192,17 @@ struct SettingsView: View {
         return "Custom"
     }
 
-    // MARK: - Serial Tab
+    // MARK: - Serial Defaults Tab
 
-    private var serialTab: some View {
-        VStack(spacing: 0) {
-            // Connection status bar
-            connectionStatusBar
-                .padding(.horizontal)
-                .padding(.top, 12)
-
-            Form {
-                // Port selection
-                Section {
-                    portSelectionView
-                } header: {
-                    HStack {
-                        Text("Serial Port")
-                        Spacer()
-                        Button(action: { portManager.enumeratePorts() }) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.plain)
-                        .help("Refresh port list")
+    private var serialDefaultsTab: some View {
+        Form {
+            Section("Default Configuration") {
+                Picker("Baud Rate", selection: $portConfig.baudRate) {
+                    ForEach(SerialPortConfig.BaudRate.allCases) { rate in
+                        Text(rate.description).tag(rate)
                     }
                 }
 
-                // Port configuration
-                Section("Configuration") {
-                    configurationView
-                }
-
-                // Line signals
-                Section("Line Signals") {
-                    Toggle("Assert DTR on connect", isOn: .constant(true))
-                    Toggle("Assert RTS on connect", isOn: .constant(true))
-                }
-            }
-            .formStyle(.grouped)
-
-            // Bottom action bar
-            actionBar
-                .padding()
-        }
-    }
-
-    private var connectionStatusBar: some View {
-        HStack(spacing: 12) {
-            // Status indicator
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(appState.isConnected ? Color.green : Color.gray.opacity(0.4))
-                    .frame(width: 10, height: 10)
-                    .overlay(
-                        Circle()
-                            .stroke(appState.isConnected ? Color.green.opacity(0.3) : Color.clear, lineWidth: 3)
-                    )
-
-                if appState.isConnected {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Connected")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.green)
-                        Text(appState.currentPort?.displayName ?? "")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    Text("Not Connected")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
-
-            // Quick actions when connected
-            if appState.isConnected {
-                HStack(spacing: 8) {
-                    // Logging toggle
-                    Button(action: {
-                        if appState.isLogging {
-                            appState.stopLogging()
-                        } else {
-                            appState.startLogging()
-                        }
-                    }) {
-                        Image(systemName: appState.isLogging ? "record.circle.fill" : "record.circle")
-                            .foregroundColor(appState.isLogging ? .red : .secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(appState.isLogging ? "Stop logging" : "Start logging")
-
-                    Divider()
-                        .frame(height: 16)
-
-                    Button("Disconnect") {
-                        appState.disconnect()
-                    }
-                    .font(.caption)
-                    .foregroundColor(.red)
-                }
-            }
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(appState.isConnected ? Color.green.opacity(0.08) : Color.secondary.opacity(0.08))
-        )
-    }
-
-    @ViewBuilder
-    private var portSelectionView: some View {
-        if portManager.availablePorts.isEmpty {
-            HStack(spacing: 12) {
-                Image(systemName: "cable.connector.slash")
-                    .font(.title2)
-                    .foregroundColor(.secondary)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("No Serial Ports Detected")
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
-                    Text("Connect a USB serial device and click refresh")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-            }
-            .padding(.vertical, 8)
-        } else {
-            ForEach(portManager.availablePorts) { port in
-                PortSelectionRow(
-                    port: port,
-                    isSelected: selectedPortPath == port.path,
-                    isConnected: appState.currentPort?.path == port.path
-                )
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if !appState.isConnected {
-                        selectedPortPath = port.path
-                    }
-                }
-            }
-        }
-    }
-
-    private var configurationView: some View {
-        Group {
-            // Baud rate - always visible
-            Picker("Baud Rate", selection: $portConfig.baudRate) {
-                ForEach(SerialPortConfig.BaudRate.allCases) { rate in
-                    Text(rate.description).tag(rate)
-                }
-            }
-
-            // Advanced options
-            if showAdvancedSerial {
                 Picker("Data Bits", selection: $portConfig.dataBits) {
                     ForEach(SerialPortConfig.DataBits.allCases) { bits in
                         Text(bits.description).tag(bits)
@@ -389,67 +234,29 @@ struct SettingsView: View {
                 }
             }
 
-            // Toggle and summary
-            HStack {
-                Text(portConfig.summary)
-                    .font(.system(.caption, design: .monospaced))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(4)
-
-                Spacer()
-
-                Button(action: { withAnimation { showAdvancedSerial.toggle() } }) {
-                    HStack(spacing: 4) {
-                        Text(showAdvancedSerial ? "Less" : "More")
-                        Image(systemName: showAdvancedSerial ? "chevron.up" : "chevron.down")
-                            .font(.caption2)
-                    }
+            Section("Presets") {
+                HStack {
+                    Button("Default") { portConfig = .default }
+                    Button("Arduino") { portConfig = .arduino }
+                    Button("Cisco") { portConfig = .ciscoConsole }
+                    Button("High Speed") { portConfig = .highSpeed }
                 }
-                .buttonStyle(.link)
+                .buttonStyle(.bordered)
+            }
+
+            Section("Line Signals") {
+                Toggle("Assert DTR on connect", isOn: .constant(true))
+                Toggle("Assert RTS on connect", isOn: .constant(true))
+            }
+
+            Section {
+                Text("Current: \(portConfig.summary)")
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundColor(.secondary)
             }
         }
-    }
-
-    private var actionBar: some View {
-        HStack {
-            // Presets menu
-            Menu {
-                Button("Default (115200 8N1)") { portConfig = .default }
-                Button("Arduino (9600 8N1)") { portConfig = .arduino }
-                Button("Cisco Console (9600 8N1)") { portConfig = .ciscoConsole }
-                Button("High Speed (921600 8N1)") { portConfig = .highSpeed }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "dial.low")
-                    Text("Presets")
-                }
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-
-            Spacer()
-
-            // Connect button
-            Button(action: connectToSelectedPort) {
-                HStack(spacing: 6) {
-                    Image(systemName: "cable.connector")
-                    Text("Connect")
-                }
-                .frame(minWidth: 100)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(selectedPortPath.isEmpty || appState.isConnected)
-            .keyboardShortcut(.return, modifiers: [])
-        }
-    }
-
-    private func connectToSelectedPort() {
-        guard let port = portManager.availablePorts.first(where: { $0.path == selectedPortPath }) else {
-            return
-        }
-        appState.connect(to: port, config: portConfig)
+        .formStyle(.grouped)
+        .padding()
     }
 
     // MARK: - Transfer Tab
@@ -537,79 +344,6 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Port Selection Row
-
-struct PortSelectionRow: View {
-    let port: SerialPortInfo
-    let isSelected: Bool
-    let isConnected: Bool
-
-    var body: some View {
-        HStack(spacing: 12) {
-            // Selection indicator
-            ZStack {
-                Circle()
-                    .stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: 2)
-                    .frame(width: 18, height: 18)
-
-                if isSelected {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 10, height: 10)
-                }
-            }
-
-            // Port icon
-            Image(systemName: isConnected ? "cable.connector.horizontal" : "cable.connector")
-                .font(.title3)
-                .foregroundColor(isConnected ? .green : .secondary)
-                .frame(width: 24)
-
-            // Port info
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(port.displayName)
-                        .fontWeight(isSelected ? .medium : .regular)
-
-                    if isConnected {
-                        Text("Connected")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.green)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.green.opacity(0.15))
-                            .cornerRadius(4)
-                    }
-                }
-
-                Text(port.path)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            // USB IDs if available
-            if let vid = port.vendorID, let pid = port.productID {
-                Text(String(format: "%04X:%04X", vid, pid))
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(4)
-            }
-        }
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.accentColor.opacity(0.08) : Color.clear)
-        )
-    }
-}
-
 #Preview {
     SettingsView()
-        .environmentObject(AppState())
 }
