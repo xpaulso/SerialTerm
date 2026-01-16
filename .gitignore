@@ -15,6 +15,7 @@ DerivedData/
 
 # macOS
 .DS_Store
+*.dmg
 
 # IDE
 .idea/
