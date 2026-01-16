@@ -6,18 +6,29 @@ A modern macOS terminal application with native serial port support, inspired by
 
 - **Native Serial Port Support**: Direct connection to serial devices via macOS IOKit
 - **File Transfer Protocols**: XMODEM, YMODEM, and ZMODEM with auto-start detection
-- **Modern UI**: Minimal, terminal-focused SwiftUI interface
+- **Modern UI**: Minimal, terminal-focused SwiftUI interface with dynamic sizing indicator
 - **Command Mode**: picocom-style escape sequences (Ctrl+A) for in-session commands
 - **Hot-plug Detection**: Automatic detection of connected/disconnected serial devices
-- **Customizable Appearance**: Fonts, colors, and preset themes (Dracula, Monokai, Solarized, etc.)
+- **Customizable Appearance**: Fonts, colors, and preset themes (Dracula, Monokai, Solarized, etc.) with live preview
 - **Session Management**: History tracking, saved connection profiles, and session logging
 - **Session Logging**: Record sessions with custom or auto-generated names
+- **Dynamic Terminal Sizing**: Automatic terminal resize with visual size indicator
 
-## Requirements
+## Installation
+
+### Download
+
+Download the latest release from the [Releases page](https://github.com/xpaulso/SerialTerm/releases):
+
+- [SerialTerm v0.2.1](https://github.com/xpaulso/SerialTerm/releases/tag/v0.2.1) - Latest
+
+Open the DMG file and drag SerialTerm to your Applications folder.
+
+## Requirements (for building from source)
 
 - macOS 14.0 or later
-- Zig 0.13.0 or later (for building)
-- Xcode 15.0 or later (for Swift components)
+- Zig 0.13.0 or later
+- Xcode 15.0 or later
 
 ## Building
 
@@ -25,7 +36,7 @@ A modern macOS terminal application with native serial port support, inspired by
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourname/SerialTerm.git
+git clone https://github.com/xpaulso/SerialTerm.git
 cd SerialTerm
 
 # Build the application
