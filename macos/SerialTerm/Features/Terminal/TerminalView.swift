@@ -823,8 +823,29 @@ class TerminalNSView: NSView {
 
     private func updateDisplay() {
         DispatchQueue.main.async { [weak self] in
-            self?.contentView.setNeedsDisplay(self?.contentView.bounds ?? .zero)
+            guard let self = self else { return }
+            self.updateContentSize()
+            self.contentView.setNeedsDisplay(self.contentView.bounds)
+            // Auto-scroll to bottom
+            self.scrollToBottom()
         }
+    }
+
+    private func updateContentSize() {
+        let scrollbackLines = currentBuffer.scrollback.count
+        let totalLines = scrollbackLines + currentBuffer.rows
+        let newHeight = CGFloat(totalLines) * charHeight + 16
+        let newWidth = CGFloat(currentBuffer.cols) * charWidth + 16
+        contentView.frame = CGRect(x: 0, y: 0, width: newWidth, height: newHeight)
+    }
+
+    func scrollToBottom() {
+        let scrollbackLines = currentBuffer.scrollback.count
+        let totalHeight = CGFloat(scrollbackLines + currentBuffer.rows) * charHeight + 16
+        let visibleHeight = scrollView.contentView.bounds.height
+        let scrollPoint = NSPoint(x: 0, y: max(0, totalHeight - visibleHeight))
+        scrollView.contentView.scroll(to: scrollPoint)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 
     func clear() {
@@ -852,9 +873,7 @@ class TerminalNSView: NSView {
             }
         }
 
-        contentView.frame = CGRect(x: 0, y: 0,
-                                    width: CGFloat(currentBuffer.cols) * charWidth + 16,
-                                    height: CGFloat(currentBuffer.rows) * charHeight + 16)
+        updateContentSize()
     }
 }
 
@@ -885,59 +904,75 @@ class TerminalContentView: NSView {
         let boldFont = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
         let italicFont = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)
 
-        // Draw each cell
-        for row in 0..<buffer.rows {
-            for col in 0..<buffer.cols {
-                let cell = buffer.grid[row][col]
-                let x = CGFloat(col) * tv.charWidth + 8
-                let y = CGFloat(row) * tv.charHeight + 8
-                let cellRect = CGRect(x: x, y: y, width: tv.charWidth, height: tv.charHeight)
+        let scrollbackCount = buffer.scrollback.count
 
-                // Resolve colors - nil means use terminal default
-                var bgColor = cell.background ?? NSColor.clear
-                var fgColor = cell.foreground ?? tv.foregroundColor
+        // Helper to draw a cell
+        func drawCell(_ cell: TerminalCell, at row: Int, col: Int) {
+            let x = CGFloat(col) * tv.charWidth + 8
+            let y = CGFloat(row) * tv.charHeight + 8
+            let cellRect = CGRect(x: x, y: y, width: tv.charWidth, height: tv.charHeight)
 
-                if cell.inverse {
-                    // When inversed, swap fg/bg but use terminal bg if cell bg was nil
-                    let resolvedBg = cell.background ?? tv.backgroundColor
-                    bgColor = fgColor
-                    fgColor = resolvedBg
+            // Skip if outside dirty rect
+            guard cellRect.intersects(dirtyRect) else { return }
+
+            // Resolve colors - nil means use terminal default
+            var bgColor = cell.background ?? NSColor.clear
+            var fgColor = cell.foreground ?? tv.foregroundColor
+
+            if cell.inverse {
+                let resolvedBg = cell.background ?? tv.backgroundColor
+                bgColor = fgColor
+                fgColor = resolvedBg
+            }
+
+            if cell.dim {
+                fgColor = fgColor.withAlphaComponent(0.5)
+            }
+
+            if bgColor != NSColor.clear {
+                bgColor.setFill()
+                cellRect.fill()
+            }
+
+            // Draw character
+            if cell.character != " " {
+                var cellFont = font
+                if cell.bold { cellFont = boldFont }
+                if cell.italic { cellFont = italicFont }
+
+                var attrs: [NSAttributedString.Key: Any] = [
+                    .font: cellFont,
+                    .foregroundColor: fgColor
+                ]
+
+                if cell.underline {
+                    attrs[.underlineStyle] = NSUnderlineStyle.single.rawValue
                 }
 
-                if cell.dim {
-                    fgColor = fgColor.withAlphaComponent(0.5)
-                }
-
-                if bgColor != NSColor.clear {
-                    bgColor.setFill()
-                    cellRect.fill()
-                }
-
-                // Draw character
-                if cell.character != " " {
-                    var cellFont = font
-                    if cell.bold { cellFont = boldFont }
-                    if cell.italic { cellFont = italicFont }
-
-                    var attrs: [NSAttributedString.Key: Any] = [
-                        .font: cellFont,
-                        .foregroundColor: fgColor
-                    ]
-
-                    if cell.underline {
-                        attrs[.underlineStyle] = NSUnderlineStyle.single.rawValue
-                    }
-
-                    let str = String(cell.character)
-                    str.draw(at: CGPoint(x: x, y: y), withAttributes: attrs)
-                }
+                let str = String(cell.character)
+                str.draw(at: CGPoint(x: x, y: y), withAttributes: attrs)
             }
         }
 
-        // Draw cursor
+        // Draw scrollback lines first
+        for (scrollRow, line) in buffer.scrollback.enumerated() {
+            for (col, cell) in line.enumerated() {
+                drawCell(cell, at: scrollRow, col: col)
+            }
+        }
+
+        // Draw current grid (below scrollback)
+        for row in 0..<buffer.rows {
+            for col in 0..<buffer.cols {
+                let cell = buffer.grid[row][col]
+                drawCell(cell, at: scrollbackCount + row, col: col)
+            }
+        }
+
+        // Draw cursor (adjusted for scrollback offset)
         if tv.cursorVisible {
             let cursorX = CGFloat(buffer.cursorCol) * tv.charWidth + 8
-            let cursorY = CGFloat(buffer.cursorRow) * tv.charHeight + 8
+            let cursorY = CGFloat(scrollbackCount + buffer.cursorRow) * tv.charHeight + 8
             let cursorRect = CGRect(x: cursorX, y: cursorY, width: tv.charWidth, height: tv.charHeight)
 
             tv.cursorColor.withAlphaComponent(0.7).setFill()

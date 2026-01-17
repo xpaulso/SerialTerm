@@ -32,7 +32,7 @@ pub const Port = struct {
         WriteError,
         Timeout,
         PortClosed,
-    } || std.posix.OpenError || std.posix.TermiosGetAttrError || std.posix.TermiosSetAttrError;
+    } || std.posix.OpenError || std.posix.TermiosGetError || std.posix.TermiosSetError;
 
     /// Opens a serial port with the specified configuration
     pub fn open(path: []const u8, config: Config) Error!Port {
@@ -86,7 +86,9 @@ pub const Port = struct {
         termios.cflag.CSIZE = .CS8;
         termios.cflag.PARENB = false;
         termios.cflag.CSTOPB = false;
-        termios.cflag.CRTSCTS = false;
+        // Hardware flow control (macOS uses separate flags)
+        termios.cflag.CCTS_OFLOW = false;
+        termios.cflag.CRTS_IFLOW = false;
 
         // Enable receiver and set local mode
         termios.cflag.CREAD = true;
@@ -125,17 +127,20 @@ pub const Port = struct {
         // Apply flow control
         switch (config.flow_control) {
             .none => {
-                termios.cflag.CRTSCTS = false;
+                termios.cflag.CCTS_OFLOW = false;
+                termios.cflag.CRTS_IFLOW = false;
                 termios.iflag.IXON = false;
                 termios.iflag.IXOFF = false;
             },
             .hardware => {
-                termios.cflag.CRTSCTS = true;
+                termios.cflag.CCTS_OFLOW = true;
+                termios.cflag.CRTS_IFLOW = true;
                 termios.iflag.IXON = false;
                 termios.iflag.IXOFF = false;
             },
             .software => {
-                termios.cflag.CRTSCTS = false;
+                termios.cflag.CCTS_OFLOW = false;
+                termios.cflag.CRTS_IFLOW = false;
                 termios.iflag.IXON = true;
                 termios.iflag.IXOFF = true;
             },
@@ -157,7 +162,9 @@ pub const Port = struct {
             if (c.ioctl(fd, c.IOSSIOSPEED, &speed) < 0) {
                 // Fall back to standard cfsetspeed for standard rates
                 const baud_const = baudToConst(config.baud_rate) orelse return Error.InvalidBaudRate;
-                _ = c.cfsetspeed(&termios, baud_const);
+                // Cast Zig termios to C termios pointer for cfsetspeed
+                const c_termios_ptr: [*c]c.struct_termios = @ptrCast(&termios);
+                _ = c.cfsetspeed(c_termios_ptr, baud_const);
                 std.posix.tcsetattr(fd, .FLUSH, termios) catch |err| {
                     return err;
                 };
@@ -165,16 +172,18 @@ pub const Port = struct {
         } else {
             // Linux/POSIX standard baud rate setting
             const baud_const = baudToConst(config.baud_rate) orelse return Error.InvalidBaudRate;
-            _ = c.cfsetispeed(&termios, baud_const);
-            _ = c.cfsetospeed(&termios, baud_const);
+            // Cast Zig termios to C termios pointer
+            const c_termios_ptr: [*c]c.struct_termios = @ptrCast(&termios);
+            _ = c.cfsetispeed(c_termios_ptr, baud_const);
+            _ = c.cfsetospeed(c_termios_ptr, baud_const);
             std.posix.tcsetattr(fd, .FLUSH, termios) catch |err| {
                 return err;
             };
         }
 
         // Clear the NONBLOCK flag now that configuration is done
-        const flags = std.posix.fcntl(fd, .GETFL, 0) catch 0;
-        _ = std.posix.fcntl(fd, .SETFL, flags & ~@as(u32, @bitCast(std.posix.O{ .NONBLOCK = true }))) catch {};
+        const flags = std.posix.fcntl(fd, c.F_GETFL, 0) catch 0;
+        _ = std.posix.fcntl(fd, c.F_SETFL, flags & ~@as(usize, c.O_NONBLOCK)) catch {};
 
         return Port{
             .fd = fd,
@@ -338,7 +347,7 @@ pub fn enumeratePorts(allocator: std.mem.Allocator) ![][]const u8 {
     }
 
     // On macOS, look for /dev/cu.* devices
-    const dev_dir = std.fs.openDirAbsolute("/dev", .{ .iterate = true }) catch return ports.toOwnedSlice();
+    var dev_dir = std.fs.openDirAbsolute("/dev", .{ .iterate = true }) catch return ports.toOwnedSlice();
     defer dev_dir.close();
 
     var iter = dev_dir.iterate();

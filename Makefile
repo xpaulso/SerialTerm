@@ -6,7 +6,7 @@
 # Configuration
 APP_NAME = SerialTerm
 BUNDLE_ID = com.serialterm.app
-VERSION = 0.1.0
+VERSION = 0.3.0
 
 BUILD_DIR = build
 ZIG_OUT = zig-out
