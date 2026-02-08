@@ -247,7 +247,7 @@ export fn serial_get_fd(handle: ?SerialPortHandle) c_int {
 // ============================================================================
 
 /// Callback type for port enumeration
-pub const EnumCallback = *const fn (path: [*:0]const u8, context: ?*anyopaque) callconv(.C) void;
+pub const EnumCallback = *const fn (path: [*:0]const u8, context: ?*anyopaque) callconv(.c) void;
 
 /// Enumerate available serial ports
 export fn serial_enumerate_ports(callback: EnumCallback, context: ?*anyopaque) SerialError {

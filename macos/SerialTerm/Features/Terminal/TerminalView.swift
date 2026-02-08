@@ -4,6 +4,7 @@ import AppKit
 /// A terminal view that displays serial output and handles keyboard input
 struct TerminalView: NSViewRepresentable {
     @Binding var output: [UInt8]
+    var terminalType: SerialPortConfig.TerminalType = .autodetect
     var onInput: (Data) -> Void
     var onSizeChange: ((Int, Int) -> Void)?
     @ObservedObject var appearanceManager = AppearanceManager.shared
@@ -16,6 +17,7 @@ struct TerminalView: NSViewRepresentable {
         let view = TerminalNSView()
         view.onInput = onInput
         view.onSizeChange = onSizeChange
+        view.terminalType = terminalType
         view.applyAppearance(appearanceManager.settings)
         context.coordinator.setupKeyMonitor(for: view)
 
@@ -29,6 +31,7 @@ struct TerminalView: NSViewRepresentable {
 
     func updateNSView(_ nsView: TerminalNSView, context: Context) {
         nsView.processOutput(output)
+        nsView.terminalType = terminalType
         nsView.applyAppearance(appearanceManager.settings)
         nsView.onSizeChange = onSizeChange
         context.coordinator.onInput = onInput
@@ -404,6 +407,7 @@ class TerminalBuffer {
 class TerminalNSView: NSView {
     var onInput: ((Data) -> Void)?
     var onSizeChange: ((Int, Int) -> Void)?
+    var terminalType: SerialPortConfig.TerminalType = .autodetect
 
     private var scrollView: NSScrollView!
     private var contentView: TerminalContentView!
@@ -775,9 +779,9 @@ class TerminalNSView: NSView {
 
     private func handleDeviceAttributes() {
         if isPrivateSequence && privateMarker == ">" {
-            sendResponse("\u{1B}[>1;10;0c")
+            sendResponse(terminalType.secondaryDAResponse)
         } else {
-            sendResponse("\u{1B}[?62;1;2;6;7;8;9c")
+            sendResponse(terminalType.primaryDAResponse)
         }
     }
 

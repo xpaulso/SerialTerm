@@ -84,6 +84,7 @@ struct ProfileDetailView: View {
                 LabeledContent("Name", value: profile.displayName)
                 LabeledContent("Port", value: profile.portPath)
                 LabeledContent("Settings", value: profile.configSummary)
+                LabeledContent("Terminal Type", value: profile.config.terminalType.description)
             }
 
             Section("Options") {
@@ -167,6 +168,11 @@ struct ProfileEditorSheet: View {
                 Picker("Flow Control", selection: $config.flowControl) {
                     ForEach(SerialPortConfig.FlowControl.allCases, id: \.self) { flow in
                         Text(flow.description).tag(flow)
+                    }
+                }
+                Picker("Terminal Type", selection: $config.terminalType) {
+                    ForEach(SerialPortConfig.TerminalType.allCases, id: \.self) { type in
+                        Text(type.description).tag(type)
                     }
                 }
             }

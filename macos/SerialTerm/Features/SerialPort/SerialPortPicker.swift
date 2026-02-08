@@ -147,6 +147,20 @@ struct SerialPortPicker: View {
                         .labelsHidden()
                         .frame(width: 90)
                     }
+
+                    // Terminal type
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Terminal")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Picker("", selection: $config.terminalType) {
+                            ForEach(SerialPortConfig.TerminalType.allCases) { type in
+                                Text(type.description).tag(type)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 110)
+                    }
                 }
 
                 Spacer()

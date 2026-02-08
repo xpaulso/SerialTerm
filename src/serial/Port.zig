@@ -340,25 +340,25 @@ pub const Port = struct {
 
 /// Enumerate available serial ports on the system
 pub fn enumeratePorts(allocator: std.mem.Allocator) ![][]const u8 {
-    var ports = std.ArrayList([]const u8).init(allocator);
+    var ports: std.ArrayList([]const u8) = .empty;
     errdefer {
         for (ports.items) |p| allocator.free(p);
-        ports.deinit();
+        ports.deinit(allocator);
     }
 
     // On macOS, look for /dev/cu.* devices
-    var dev_dir = std.fs.openDirAbsolute("/dev", .{ .iterate = true }) catch return ports.toOwnedSlice();
+    var dev_dir = std.fs.openDirAbsolute("/dev", .{ .iterate = true }) catch return ports.toOwnedSlice(allocator);
     defer dev_dir.close();
 
     var iter = dev_dir.iterate();
     while (iter.next() catch null) |entry| {
         if (std.mem.startsWith(u8, entry.name, "cu.")) {
             const full_path = try std.fmt.allocPrint(allocator, "/dev/{s}", .{entry.name});
-            try ports.append(full_path);
+            try ports.append(allocator, full_path);
         }
     }
 
-    return ports.toOwnedSlice();
+    return ports.toOwnedSlice(allocator);
 }
 
 test "enumeratePorts" {

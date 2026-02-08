@@ -61,6 +61,7 @@ pub const ZModem = struct {
     // Auto-start detection string
     pub const AUTOSTART_SEQ = "rz\r**\x18B";
 
+    allocator: std.mem.Allocator,
     state: State,
     callback: EventCallback,
     context: ?*anyopaque,
@@ -117,15 +118,16 @@ pub const ZModem = struct {
 
     pub fn init(allocator: std.mem.Allocator, callback: EventCallback, context: ?*anyopaque) ZModem {
         return ZModem{
+            .allocator = allocator,
             .state = .idle,
             .callback = callback,
             .context = context,
-            .recv_buffer = std.ArrayList(u8).init(allocator),
+            .recv_buffer = .empty,
         };
     }
 
     pub fn deinit(self: *ZModem) void {
-        self.recv_buffer.deinit();
+        self.recv_buffer.deinit(self.allocator);
     }
 
     /// Check if data contains ZMODEM auto-start sequence
@@ -434,7 +436,7 @@ pub const ZModem = struct {
         // Extract data (excluding CRC and type byte)
         const data_end = self.frame_pos - (if (self.use_crc32) @as(usize, 5) else @as(usize, 3));
         if (data_end > 0) {
-            self.recv_buffer.appendSlice(self.frame_buffer[0..data_end]) catch {
+            self.recv_buffer.appendSlice(self.allocator, self.frame_buffer[0..data_end]) catch {
                 self.handleError("Out of memory");
                 return;
             };

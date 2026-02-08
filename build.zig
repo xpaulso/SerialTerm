@@ -4,27 +4,24 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Build the serial terminal library
-    const lib = b.addStaticLibrary(.{
-        .name = "serialterm",
+    // Create the root module for the serial terminal library
+    const lib_module = b.createModule(.{
         .root_source_file = b.path("src/serial/c_api.zig"),
         .target = target,
         .optimize = optimize,
-    });
-
-    // Add source files
-    lib.addCSourceFiles(.{
-        .files = &.{},
-        .flags = &.{"-std=c11"},
+        .link_libc = true,
     });
 
     // Link system libraries for macOS
-    if (target.result.os.tag == .macos) {
-        lib.linkFramework("IOKit");
-        lib.linkFramework("CoreFoundation");
-    }
+    lib_module.linkFramework("IOKit", .{});
+    lib_module.linkFramework("CoreFoundation", .{});
 
-    lib.linkLibC();
+    // Build the serial terminal library
+    const lib = b.addLibrary(.{
+        .name = "serialterm",
+        .linkage = .static,
+        .root_module = lib_module,
+    });
 
     // Install the library
     b.installArtifact(lib);
@@ -34,16 +31,24 @@ pub fn build(b: *std.Build) void {
     b.installFile("include/transfer.h", "include/transfer.h");
 
     // Build tests
-    const main_tests = b.addTest(.{
+    const main_test_module = b.createModule(.{
         .root_source_file = b.path("src/serial/Port.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    const transfer_tests = b.addTest(.{
+    const transfer_test_module = b.createModule(.{
         .root_source_file = b.path("src/transfer/xmodem.zig"),
         .target = target,
         .optimize = optimize,
+    });
+
+    const main_tests = b.addTest(.{
+        .root_module = main_test_module,
+    });
+
+    const transfer_tests = b.addTest(.{
+        .root_module = transfer_test_module,
     });
 
     const run_main_tests = b.addRunArtifact(main_tests);

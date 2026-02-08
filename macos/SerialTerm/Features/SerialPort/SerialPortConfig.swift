@@ -9,6 +9,7 @@ struct SerialPortConfig: Codable, Equatable, Hashable {
     var flowControl: FlowControl = .none
     var localEcho: Bool = false
     var lineEnding: LineEnding = .cr
+    var terminalType: TerminalType = .autodetect
 
     /// Standard baud rates
     enum BaudRate: Int, CaseIterable, Identifiable, Codable {
@@ -117,6 +118,53 @@ struct SerialPortConfig: Codable, Equatable, Hashable {
             case .cr: return Data([0x0D])
             case .lf: return Data([0x0A])
             case .crlf: return Data([0x0D, 0x0A])
+            }
+        }
+    }
+
+    /// Terminal type for escape sequence identification and DA responses
+    enum TerminalType: String, CaseIterable, Identifiable, Codable {
+        case autodetect
+        case vt100
+        case vt220
+        case linux
+
+        var id: String { rawValue }
+
+        var description: String {
+            switch self {
+            case .autodetect: return "Auto Detect"
+            case .vt100: return "VT100"
+            case .vt220: return "VT220"
+            case .linux: return "Linux Console"
+            }
+        }
+
+        /// Primary DA response for CSI c / CSI 0 c
+        var primaryDAResponse: String {
+            switch self {
+            case .vt100:
+                return "\u{1B}[?1;2c"
+            case .vt220:
+                return "\u{1B}[?62;1;2;6;7;8;9c"
+            case .linux:
+                return "\u{1B}[?6c"
+            case .autodetect:
+                return "\u{1B}[?64;1;2;6;9;15;16;17;18;21;22c"
+            }
+        }
+
+        /// Secondary DA response for CSI > c
+        var secondaryDAResponse: String {
+            switch self {
+            case .vt100:
+                return "\u{1B}[>0;10;0c"
+            case .vt220:
+                return "\u{1B}[>1;10;0c"
+            case .linux:
+                return "\u{1B}[>0;0;0c"
+            case .autodetect:
+                return "\u{1B}[>1;10;0c"
             }
         }
     }

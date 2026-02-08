@@ -11,6 +11,7 @@ struct ContentView: View {
             // Terminal view with appearance settings
             TerminalView(
                 output: $appState.terminalOutput,
+                terminalType: appState.portConfig.terminalType,
                 onInput: handleInput,
                 onSizeChange: { cols, rows in
                     appState.terminalSize = (cols, rows)

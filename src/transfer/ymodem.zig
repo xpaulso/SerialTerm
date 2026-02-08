@@ -14,6 +14,7 @@ pub const YModem = struct {
     const BLOCK_SIZE_1K = 1024;
     const MAX_RETRIES = 10;
 
+    allocator: std.mem.Allocator,
     state: State,
     block_num: u8,
     retry_count: u8,
@@ -66,17 +67,18 @@ pub const YModem = struct {
 
     pub fn init(allocator: std.mem.Allocator, callback: EventCallback, context: ?*anyopaque) YModem {
         return YModem{
+            .allocator = allocator,
             .state = .idle,
             .block_num = 0,
             .retry_count = 0,
             .callback = callback,
             .context = context,
-            .recv_buffer = std.ArrayList(u8).init(allocator),
+            .recv_buffer = .empty,
         };
     }
 
     pub fn deinit(self: *YModem) void {
-        self.recv_buffer.deinit();
+        self.recv_buffer.deinit(self.allocator);
     }
 
     /// Start sending a file
@@ -456,7 +458,7 @@ pub const YModem = struct {
         if (block_num == self.block_num) {
             // Calculate how much actual data to store
             const store_len = @min(self.expected_block_size, self.bytes_remaining);
-            self.recv_buffer.appendSlice(data_slice[0..store_len]) catch {
+            self.recv_buffer.appendSlice(self.allocator, data_slice[0..store_len]) catch {
                 self.handleError("Out of memory");
                 return;
             };

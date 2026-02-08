@@ -232,6 +232,12 @@ struct SettingsView: View {
                         Text(ending.description).tag(ending)
                     }
                 }
+
+                Picker("Terminal Type", selection: $portConfig.terminalType) {
+                    ForEach(SerialPortConfig.TerminalType.allCases) { type in
+                        Text(type.description).tag(type)
+                    }
+                }
             }
 
             Section("Presets") {

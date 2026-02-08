@@ -15,6 +15,7 @@ pub const XModem = struct {
     const MAX_RETRIES = 10;
     const TIMEOUT_MS = 10000;
 
+    allocator: std.mem.Allocator,
     state: State,
     mode: Mode,
     block_num: u8,
@@ -60,18 +61,19 @@ pub const XModem = struct {
 
     pub fn init(allocator: std.mem.Allocator, callback: EventCallback, context: ?*anyopaque) XModem {
         return XModem{
+            .allocator = allocator,
             .state = .idle,
             .mode = .crc,
             .block_num = 1,
             .retry_count = 0,
             .callback = callback,
             .context = context,
-            .recv_buffer = std.ArrayList(u8).init(allocator),
+            .recv_buffer = .empty,
         };
     }
 
     pub fn deinit(self: *XModem) void {
-        self.recv_buffer.deinit();
+        self.recv_buffer.deinit(self.allocator);
     }
 
     /// Start sending a file
@@ -310,7 +312,7 @@ pub const XModem = struct {
         // Check block number
         if (block_num == self.block_num) {
             // Accept block
-            self.recv_buffer.appendSlice(data_slice) catch {
+            self.recv_buffer.appendSlice(self.allocator, data_slice) catch {
                 self.handleError("Out of memory");
                 return;
             };
